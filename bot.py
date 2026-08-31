@@ -1,5 +1,11 @@
 import os
 import asyncio
+
+# --- RENDER PYTHON ASYNCIO FIX (Yeh 2 lines error fix karengi) ---
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+# -----------------------------------------------------------------
+
 import threading
 from flask import Flask
 from pyrogram import Client, filters
@@ -25,8 +31,7 @@ API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "ScreenEmpire")
 DB_CHANNEL = int(os.environ.get("DB_CHANNEL", 0))
-# Default 60 seconds (1 minute) as you requested earlier
-AUTO_DELETE_TIME = int(os.environ.get("AUTO_DELETE_TIME", 60)) 
+AUTO_DELETE_TIME = int(os.environ.get("AUTO_DELETE_TIME", 60))
 
 app = Client(
     "ScreenEmpireBot",
@@ -98,7 +103,7 @@ async def start_command(client, message: Message):
             await message.reply_text("❌ **Error:** File not found or invalid link!")
             return
 
-    # Professional Home Menu (Inspired by the reference image)
+    # Professional Home Menu 
     home_keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔎 SEARCH MOVIES OR SERIES 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")],
         [InlineKeyboardButton("📤 SHARE NOW 📤", url=f"https://t.me/share/url?url=https://t.me/ScreenEmpireBot&text=Join%20ScreenEmpire%20for%20the%20latest%20Movies%20and%20Web%20Series!")]
@@ -111,11 +116,5 @@ async def start_command(client, message: Message):
         reply_markup=home_keyboard
     )
 
-# --- UPDATED RUNNER TO FIX RENDER ERROR ---
-async def main():
-    async with app:
-        print("ScreenEmpire Bot is Online!")
-        await asyncio.Event().wait()
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    app.run()
