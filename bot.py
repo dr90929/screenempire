@@ -30,21 +30,20 @@ async def is_subscribed(client, user_id):
 @app.on_message(filters.command("start"))
 async def start_command(client, message: Message):
     user_id = message.from_user.id
-    user_name = message.from_user.first_name or "Movie Lover"
+    user_name = message.from_user.first_name or "Buddy"
     
     # Force Subscribe Check
     if CHANNEL_USERNAME:
         not_joined = not await is_subscribed(client, user_id)
         if not_joined:
             btn = InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 Join ScreenEmpire Channel", url=f"https://t.me/{CHANNEL_USERNAME}")],
-                [InlineKeyboardButton("🔄 I Have Joined (Try Again)", callback_data="check_sub")]
+                [InlineKeyboardButton("📢 Join ScreenEmpire", url=f"https://t.me/{CHANNEL_USERNAME}")],
+                [InlineKeyboardButton("🔄 Try Again", callback_data="check_sub")]
             ])
             await message.reply_text(
-                f"👋 Hello **{user_name}**!\n\n"
-                f"⚠️ **Access Denied!**\n"
-                f"To use this bot and watch movies, you must join our official channel first.\n\n"
-                f"*(Pehle hamara channel join karein, tabhi movies access milengi!)*",
+                f"Hey 👋 {user_name} 🤩\n\n"
+                f"⚠️ **Access Restricted!**\n"
+                f"To access the world's coolest movie database, you must join our official channel first.",
                 reply_markup=btn
             )
             return
@@ -57,14 +56,14 @@ async def start_command(client, message: Message):
             if msg:
                 sent_msg = await msg.copy(
                     chat_id=message.chat.id,
-                    caption=f"🎬 **Here is your file!**\n\n⚡ Powered by **ScreenEmpire**"
+                    caption=f"🎬 **Here is your file!**\n\n🍿 Powered by **ScreenEmpire**"
                 )
                 
                 minutes = AUTO_DELETE_TIME // 60
                 warning_text = await message.reply_text(
                     f"⏱️ **Auto-Delete Notice:**\n"
-                    f"Yeh media agle **{minutes} minutes** mein apne aap delete ho jayegi. Kripya ise turant save ya forward kar lein!\n\n"
-                    f"*(This file will auto-delete in {minutes} mins to avoid copyright issues.)*"
+                    f"This file will auto-delete in **{minutes} minutes**. Please save or forward it immediately!",
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚡ Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]])
                 )
                 
                 async def delete_after_delay():
@@ -78,23 +77,19 @@ async def start_command(client, message: Message):
                 asyncio.create_task(delete_after_delay())
                 return
         except Exception:
-            await message.reply_text("❌ **Error:** Invalid link ya file nahi mili! Please correct link use karein.")
+            await message.reply_text("❌ **Error:** File not found or invalid link!")
             return
 
-    # Professional Home Menu
+    # Professional Home Menu (Inspired by the reference image)
     home_keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎬 Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")],
-        [InlineKeyboardButton("⚡ Request Movie", url=f"https://t.me/{CHANNEL_USERNAME}")]
+        [InlineKeyboardButton("🔎 SEARCH MOVIES OR SERIES 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")],
+        [InlineKeyboardButton("📤 SHARE NOW 📤", url=f"https://t.me/share/url?url=https://t.me/ScreenEmpireBot&text=Join%20ScreenEmpire%20for%20the%20latest%20Movies%20and%20Web%20Series!")]
     ])
     
     await message.reply_text(
-        f"✨ **Welcome to ScreenEmpire, {user_name}!** ✨\n\n"
-        f"Aapka apna ultimate destination movies aur web series ke liye. Yahan aapko sab kuch milega ek hi jagah par!\n\n"
-        f"📌 **How to use:**\n"
-        f"1. Channel par di gayi movie link par click karein.\n"
-        f"2. Bot aapko yahan movie bhej dega.\n"
-        f"3. Fast download karein kyunki files auto-delete hoti hain!\n\n"
-        f"👇 Neeche diye gaye button se hamare main channel se jude rahein.",
+        f"Hey 👋 **{user_name}** 🤩\n\n"
+        f"🍿 **WELCOME TO THE WORLD'S COOLEST MOVIE HUB!**\n\n"
+        f"Here You Can Request Movies & Web Series. Just click the links provided in our main channel to get your files instantly..!!",
         reply_markup=home_keyboard
     )
 
