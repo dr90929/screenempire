@@ -1,15 +1,32 @@
 import os
 import asyncio
+import threading
+from flask import Flask
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pyrogram.errors import UserNotParticipant
+
+# --- DUMMY WEB SERVER FOR RENDER ---
+web_app = Flask(__name__)
+
+@web_app.route('/')
+def home():
+    return "ScreenEmpire Bot is Running Alive!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    web_app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_web, daemon=True).start()
+# ------------------------------------
 
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "ScreenEmpire")
 DB_CHANNEL = int(os.environ.get("DB_CHANNEL", 0))
-AUTO_DELETE_TIME = int(os.environ.get("AUTO_DELETE_TIME", 300))
+# Default 60 seconds (1 minute) as you requested earlier
+AUTO_DELETE_TIME = int(os.environ.get("AUTO_DELETE_TIME", 60)) 
 
 app = Client(
     "ScreenEmpireBot",
@@ -60,9 +77,10 @@ async def start_command(client, message: Message):
                 )
                 
                 minutes = AUTO_DELETE_TIME // 60
+                time_label = f"{minutes} minute" if minutes > 0 else f"{AUTO_DELETE_TIME} seconds"
                 warning_text = await message.reply_text(
                     f"⏱️ **Auto-Delete Notice:**\n"
-                    f"This file will auto-delete in **{minutes} minutes**. Please save or forward it immediately!",
+                    f"This file will auto-delete in **{time_label}**. Please save or forward it immediately!",
                     reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚡ Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]])
                 )
                 
@@ -89,8 +107,15 @@ async def start_command(client, message: Message):
     await message.reply_text(
         f"Hey 👋 **{user_name}** 🤩\n\n"
         f"🍿 **WELCOME TO THE WORLD'S COOLEST MOVIE HUB!**\n\n"
-        f"Here You Can Request Movies & Web Series. Just click the links provided in our main channel to get your files instantly..!!",
+        f"Here You Can Request Movies & Web Series. Just send the real Movie or Web Series name with proper English spelling to get your files instantly..!!",
         reply_markup=home_keyboard
     )
 
-app.run()
+# --- UPDATED RUNNER TO FIX RENDER ERROR ---
+async def main():
+    async with app:
+        print("ScreenEmpire Bot is Online!")
+        await asyncio.Event().wait()
+
+if __name__ == "__main__":
+    asyncio.run(main())
