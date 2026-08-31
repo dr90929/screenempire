@@ -114,7 +114,16 @@ async def start_command(client, message: Message):
                     await asyncio.sleep(AUTO_DELETE_TIME)
                     try:
                         await sent_msg.delete()
-                        await warning_text.delete()
+                        # Copyright Warning Notice update on delete
+                        await warning_text.edit_text(
+                            f"Hey **{user_name}**, \n\n"
+                            f"❌ **Your Request Has Been Deleted 👍**\n"
+                            f"*(Due To Avoid Copyrights Issue 😔)*\n\n"
+                            f"❤️ **If You Want That File, Request Again!**",
+                            reply_markup=InlineKeyboardMarkup([
+                                [InlineKeyboardButton("🔎 SEARCH AGAIN 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")]
+                            ])
+                        )
                     except Exception:
                         pass
                 
@@ -137,7 +146,7 @@ async def start_command(client, message: Message):
         reply_markup=home_keyboard
     )
 
-# 3. AUTO-FILTER TEXT SEARCH (Searches DB by movie name)
+# 3. AUTO-FILTER TEXT SEARCH WITH SMART REGEX & INLINE BUTTONS
 @app.on_message(filters.private & filters.text & ~filters.command("start"))
 async def search_movie(client, message: Message):
     user_id = message.from_user.id
@@ -149,41 +158,38 @@ async def search_movie(client, message: Message):
             return
 
     query = message.text.strip()
-    regex_query = re.compile(query, re.IGNORECASE) 
     
-    # Database se match dhoondhna (Limit 3)
-    cursor = collection.find({"file_name": regex_query}).limit(3)
-    results = await cursor.to_list(length=3)
+    # Smart Search Engine Logic (Ignores dots, dashes, underscores)
+    clean_query = query.replace(".", " ").replace("-", " ").replace("_", " ")
+    query_words = clean_query.split()
+    regex_string = ".*".join(query_words)
+    regex_query = re.compile(regex_string, re.IGNORECASE) 
+    
+    # Database se match dhoondhna (Max 10 results list ke liye)
+    cursor = collection.find({"file_name": regex_query}).limit(10)
+    results = await cursor.to_list(length=10)
     
     if not results:
         await message.reply_text(f"❌ **No movies found for '{query}'!**\nPlease check the spelling and try again.")
         return
         
+    # Buttons ki list taiyar karna
+    buttons = []
     for res in results:
-        try:
-            sent_msg = await client.copy_message(
-                chat_id=message.chat.id,
-                from_chat_id=DB_CHANNEL,
-                message_id=res["message_id"],
-                caption=f"🎬 **{res['file_name']}**\n\n🍿 Powered by **ScreenEmpire**"
-            )
-            
-            minutes = AUTO_DELETE_TIME // 60
-            time_label = f"{minutes} minute" if minutes > 0 else f"{AUTO_DELETE_TIME} seconds"
-            warning_text = await message.reply_text(
-                f"⏱️ **Auto-Delete Notice:**\nThis file will auto-delete in **{time_label}**. Save or forward it immediately!"
-            )
-            
-            async def delete_after_delay(msg_to_del, warn_to_del):
-                await asyncio.sleep(AUTO_DELETE_TIME)
-                try:
-                    await msg_to_del.delete()
-                    await warn_to_del.delete()
-                except: pass
-                
-            asyncio.create_task(delete_after_delay(sent_msg, warning_text))
-        except Exception as e:
-            print(f"File bhejte time error: {e}")
+        f_name = res["file_name"]
+        msg_id = res["message_id"]
+        buttons.append([InlineKeyboardButton(f"🎬 {f_name}", url=f"https://t.me/{client.me.username}?start={msg_id}")])
+    
+    buttons.append([InlineKeyboardButton("📢 Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")])
+    reply_markup = InlineKeyboardMarkup(buttons)
+    
+    await message.reply_text(
+        f"Hey **{message.from_user.first_name}** 👋\n\n"
+        f"🔍 **Search Results for:** `{query}`\n"
+        f"📂 **Total Files Found:** `{len(results)}`\n\n"
+        f"👇 *Click any button below to get your file instantly:*",
+        reply_markup=reply_markup
+    )
 
 if __name__ == "__main__":
     app.run()
