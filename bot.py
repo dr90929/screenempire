@@ -91,55 +91,6 @@ async def start_command(client, message: Message):
             )
             return
 
-    # Deep-linking / File Forwarding Logic
-    if len(message.command) > 1:
-        try:
-            file_id = int(message.command[1])
-            
-            # --- FIX: User ke click karke aate hi start message ko delete kar do taaki list hat jaye ---
-            try:
-                await message.delete()
-            except:
-                pass
-
-            msg = await client.get_messages(DB_CHANNEL, file_id)
-            if msg:
-                sent_msg = await msg.copy(
-                    chat_id=message.chat.id,
-                    caption=f"🎬 **Here is your file!**\n\n🍿 Powered by **ScreenEmpire**"
-                )
-                
-                minutes = AUTO_DELETE_TIME // 60
-                time_label = f"{minutes} minute" if minutes > 0 else f"{AUTO_DELETE_TIME} seconds"
-                warning_text = await message.reply_text(
-                    f"⏱️ **Auto-Delete Notice:**\n"
-                    f"This file will auto-delete in **{time_label}**. Please save or forward it immediately!",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚡ Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]])
-                )
-                
-                async def delete_after_delay():
-                    await asyncio.sleep(AUTO_DELETE_TIME)
-                    try:
-                        await sent_msg.delete()
-                        # Copyright Warning Notice update on delete
-                        await warning_text.edit_text(
-                            f"Hey **{user_name}**, \n\n"
-                            f"❌ **Your Request Has Been Deleted 👍**\n"
-                            f"*(Due To Avoid Copyrights Issue 😔)*\n\n"
-                            f"❤️ **If You Want That File, Request Again!**",
-                            reply_markup=InlineKeyboardMarkup([
-                                [InlineKeyboardButton("🔎 SEARCH AGAIN 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")]
-                            ])
-                        )
-                    except Exception:
-                        pass
-                
-                asyncio.create_task(delete_after_delay())
-                return
-        except Exception:
-            await message.reply_text("❌ **Error:** File not found or invalid link!")
-            return
-
     # Professional Home Menu 
     home_keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔎 SEARCH MOVIES OR SERIES 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")],
@@ -153,7 +104,7 @@ async def start_command(client, message: Message):
         reply_markup=home_keyboard
     )
 
-# 3. AUTO-FILTER TEXT SEARCH WITH SMART REGEX & INLINE BUTTONS (Fixed asterisks issue)
+# 3. AUTO-FILTER TEXT SEARCH WITH SMART REGEX & CALLBACK BUTTONS
 @app.on_message(filters.private & filters.text & ~filters.command("start"))
 async def search_movie(client, message: Message):
     user_id = message.from_user.id
@@ -180,24 +131,75 @@ async def search_movie(client, message: Message):
         await message.reply_text(f"❌ **No movies found for '{query}'!**\nPlease check the spelling and try again.")
         return
         
-    # Buttons ki list taiyar karna
+    # Buttons ki list taiyar karna (Using callback_data to fix file not found error)
     buttons = []
     for res in results:
         f_name = res["file_name"]
         msg_id = res["message_id"]
-        buttons.append([InlineKeyboardButton(f"🎬 {f_name}", url=f"https://t.me/{client.me.username}?start={msg_id}")])
+        buttons.append([InlineKeyboardButton(f"🎬 {f_name}", callback_data=f"get_file_{msg_id}")])
     
     buttons.append([InlineKeyboardButton("📢 Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")])
     reply_markup = InlineKeyboardMarkup(buttons)
     
-    # Clean UI header without broken markdown asterisks
     await message.reply_text(
-        f"👤 Hey **{message.from_user.first_name}** 👋\n\n"
-        f"🔄 Rotate your phone to see files' full name..........................⭕\n\n"
-        f"📌 **Title:** `{query}`\n"
-        f"✨ **Your Files is Ready Now**",
+        f"Hey **{message.from_user.first_name}** 👋\n\n"
+        f"🔍 **Search Results for:** `{query}`\n"
+        f"📂 **Total Files Found:** `{len(results)}`\n\n"
+        f"👇 *Click any button below to get your file instantly:*",
         reply_markup=reply_markup
     )
+
+# 4. INSTANT CALLBACK HANDLER (Delivers file without any link errors)
+@app.on_callback_query(filters.regex(r"^get_file_"))
+async def callback_file_handler(client, callback_query):
+    user_name = callback_query.from_user.first_name or "Buddy"
+    
+    try:
+        file_id = int(callback_query.data.split("_")[2])
+        
+        # Purani search list ko hata dena
+        try:
+            await callback_query.message.delete()
+        except:
+            pass
+            
+        msg = await client.get_messages(DB_CHANNEL, file_id)
+        if msg:
+            sent_msg = await msg.copy(
+                chat_id=callback_query.message.chat.id,
+                caption=f"🎬 **Here is your file!**\n\n🍿 Powered by **ScreenEmpire**"
+            )
+            
+            minutes = AUTO_DELETE_TIME // 60
+            time_label = f"{minutes} minute" if minutes > 0 else f"{AUTO_DELETE_TIME} seconds"
+            warning_text = await callback_query.message.reply_text(
+                f"⏱️ **Auto-Delete Notice:**\n"
+                f"This file will auto-delete in **{time_label}**. Please save or forward it immediately!",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚡ Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]])
+            )
+            
+            async def delete_after_delay():
+                await asyncio.sleep(AUTO_DELETE_TIME)
+                try:
+                    await sent_msg.delete()
+                    await warning_text.edit_text(
+                        f"Hey **{user_name}**, \n\n"
+                        f"❌ **Your Request Has Been Deleted 👍**\n"
+                        f"*(Due To Avoid Copyrights Issue 😔)*\n\n"
+                        f"❤️ **If You Want That File, Request Again!**",
+                        reply_markup=InlineKeyboardMarkup([
+                            [InlineKeyboardButton("🔎 SEARCH AGAIN 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")]
+                        ])
+                    )
+                except Exception:
+                    pass
+            
+            asyncio.create_task(delete_after_delay())
+        else:
+            await callback_query.answer("❌ File not found in database channel!", show_alert=True)
+    except Exception as e:
+        print(f"Callback error: {e}")
+        await callback_query.answer("❌ An error occurred!", show_alert=True)
 
 if __name__ == "__main__":
     app.run()
