@@ -95,31 +95,38 @@ async def start_command(client, message: Message):
     if len(message.command) > 1:
         try:
             file_id = int(message.command[1])
+            
+            # --- PRO FEATURE: User ke click karte hi start command message ko delete kar do ---
+            try:
+                await message.delete()
+            except:
+                pass
+
             msg = await client.get_messages(DB_CHANNEL, file_id)
             if msg:
-                sent_msg = await msg.copy(
-                    chat_id=message.chat.id,
-                    caption=f"🎬 **Here is your file!**\n\n🍿 Powered by **ScreenEmpire**"
-                )
-                
                 minutes = AUTO_DELETE_TIME // 60
                 time_label = f"{minutes} minute" if minutes > 0 else f"{AUTO_DELETE_TIME} seconds"
-                warning_text = await message.reply_text(
-                    f"⏱️ **Auto-Delete Notice:**\n"
-                    f"This file will auto-delete in **{time_label}**. Please save or forward it immediately!",
-                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⚡ Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")]])
+                
+                # File ke sath professional caption jisme timer mention ho
+                sent_msg = await msg.copy(
+                    chat_id=message.chat.id,
+                    caption=(
+                        f"🎬 **{msg.document.file_name if msg.document else 'Movie File'}**\n\n"
+                        f"⚠️ ❌ *This file will automatically delete after {time_label}! Please forward it to saved messages.*"
+                    )
                 )
                 
                 async def delete_after_delay():
                     await asyncio.sleep(AUTO_DELETE_TIME)
                     try:
-                        await sent_msg.delete()
-                        # Copyright Warning Notice update on delete
-                        await warning_text.edit_text(
-                            f"Hey **{user_name}**, \n\n"
-                            f"❌ **Your Request Has Been Deleted 👍**\n"
-                            f"*(Due To Avoid Copyrights Issue 😔)*\n\n"
-                            f"❤️ **If You Want That File, Request Again!**",
+                        # Sirf file delete hogi aur wahi message edit ho kar Copyright notice ban jayega (No spam messages)
+                        await sent_msg.edit_caption(
+                            caption=(
+                                f"Hey **{user_name}**, \n\n"
+                                f"❌ **Your Request Has Been Deleted 👍**\n"
+                                f"*(Due To Avoid Copyrights Issue 😔)*\n\n"
+                                f"❤️ **If You Want That File, Request Again!**"
+                            ),
                             reply_markup=InlineKeyboardMarkup([
                                 [InlineKeyboardButton("🔎 SEARCH AGAIN 🔎", url=f"https://t.me/{CHANNEL_USERNAME}")]
                             ])
@@ -146,7 +153,7 @@ async def start_command(client, message: Message):
         reply_markup=home_keyboard
     )
 
-# 3. AUTO-FILTER TEXT SEARCH WITH SMART REGEX & INLINE BUTTONS
+# 3. AUTO-FILTER TEXT SEARCH WITH SMART REGEX & CLEAN UI
 @app.on_message(filters.private & filters.text & ~filters.command("start"))
 async def search_movie(client, message: Message):
     user_id = message.from_user.id
@@ -183,11 +190,12 @@ async def search_movie(client, message: Message):
     buttons.append([InlineKeyboardButton("📢 Join Main Channel", url=f"https://t.me/{CHANNEL_USERNAME}")])
     reply_markup = InlineKeyboardMarkup(buttons)
     
+    # Professional iPopkorn-style clean UI header (Without watermark posters)
     await message.reply_text(
-        f"Hey **{message.from_user.first_name}** 👋\n\n"
-        f"🔍 **Search Results for:** `{query}`\n"
-        f"📂 **Total Files Found:** `{len(results)}`\n\n"
-        f"👇 *Click any button below to get your file instantly:*",
+        f"👤 Hey **{message.from_user.first_name}** 👋\n\n"
+        f"🔄 *Rotate your phone to see files' full name..........................⭕*\n\n"
+        f"📌 *Title :* `{query}`\n"
+        f"✨ *Your Files is Ready Now*",
         reply_markup=reply_markup
     )
 
