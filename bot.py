@@ -13,6 +13,7 @@ asyncio.set_event_loop(loop)
 import threading
 from flask import Flask
 from pyrogram import Client, filters
+from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pyrogram.errors import UserNotParticipant
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -460,7 +461,7 @@ async def send_requested_file(
                 f"🎬 <b>{safe_file_name}</b>\n\n"
                 f"🍿 Powered by <b>ScreenEmpire</b>"
             ),
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
         # ----------------------------------------------------
@@ -491,7 +492,7 @@ async def send_requested_file(
                 f"<b>{time_label}</b>.\n\n"
                 f"💾 Please save or forward it immediately!"
             ),
-            parse_mode="html",
+            parse_mode=ParseMode.HTML,
             reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(
@@ -710,7 +711,7 @@ async def start_command(
                     f"channel first."
                 ),
                 reply_markup=btn,
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
             return
@@ -752,7 +753,7 @@ async def start_command(
 
             await message.reply_text(
                 "❌ <b>Error:</b> File not found or invalid link!",
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
             return
@@ -791,7 +792,7 @@ async def start_command(
             f"instantly..!!"
         ),
         reply_markup=home_keyboard,
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -838,7 +839,7 @@ async def check_subscription_callback(
             "Now send me the movie or series name "
             "you want to search. 🍿"
         ),
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -1108,7 +1109,7 @@ async def index_command(
     progress_message = await message.reply_text(
         "🔄 <b>Starting DB Channel indexing...</b>\n\n"
         "Please wait...",
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
     scanned = 0
@@ -1182,7 +1183,7 @@ async def index_command(
                             f"⏭️ Skipped: <b>{skipped}</b>\n"
                             f"❌ Errors: <b>{errors}</b>"
                         ),
-                        parse_mode="html"
+                        parse_mode=ParseMode.HTML
                     )
 
                 except Exception:
@@ -1201,7 +1202,7 @@ async def index_command(
                 f"⏭️ Non-file messages: <b>{skipped}</b>\n"
                 f"❌ Errors: <b>{errors}</b>"
             ),
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
     except Exception as e:
@@ -1221,7 +1222,7 @@ async def index_command(
                     f"❌ Errors: <b>{errors}</b>\n\n"
                     f"<code>{html.escape(str(e))}</code>"
                 ),
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
         except Exception:
@@ -1309,7 +1310,7 @@ async def stats_command(
                 f"📁 <b>Total Indexed Files:</b> {total_files}\n"
                 f"🔎 <b>Active Search Sessions:</b> {total_search_sessions}"
             ),
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
     except Exception as e:
@@ -1382,7 +1383,7 @@ async def broadcast_command(
 
         broadcast_message = await message.reply_text(
             "📢 <b>Broadcast started...</b>",
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
         sent = 0
@@ -1458,7 +1459,7 @@ async def broadcast_command(
                     f"✅ Sent: <b>{sent}</b>\n"
                     f"❌ Failed: <b>{failed}</b>"
                 ),
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
         except Exception:
@@ -1486,7 +1487,7 @@ async def broadcast_command(
             "Now send the message you want to broadcast.\n\n"
             "Send /cancel to cancel."
         ),
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
 
@@ -1540,7 +1541,7 @@ async def broadcast_message_capture(
 
     status_message = await message.reply_text(
         "📢 <b>Broadcast started...</b>",
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
     sent = 0
@@ -1617,7 +1618,7 @@ async def broadcast_message_capture(
                 f"✅ Sent: <b>{sent}</b>\n"
                 f"❌ Failed: <b>{failed}</b>"
             ),
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
     except Exception:
@@ -1666,7 +1667,7 @@ async def search_movie(
                     f"@{html.escape(CHANNEL_USERNAME)} "
                     f"to search movies."
                 ),
-                parse_mode="html"
+                parse_mode=ParseMode.HTML
             )
 
             return
@@ -1836,7 +1837,7 @@ async def search_movie(
                 f"'{safe_query}'!</b>\n\n"
                 f"Please check the spelling and try again."
             ),
-            parse_mode="html"
+            parse_mode=ParseMode.HTML
         )
 
         return
@@ -1942,7 +1943,7 @@ async def search_movie(
     results_message = await message.reply_text(
         result_text,
         reply_markup=keyboard,
-        parse_mode="html"
+        parse_mode=ParseMode.HTML
     )
 
     # --------------------------------------------------------
