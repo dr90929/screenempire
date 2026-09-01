@@ -12,7 +12,7 @@ asyncio.set_event_loop(loop)
 
 import threading
 from flask import Flask
-from pyrogram import Client, filters
+from pyrogram import Client, filters, ContinuePropagation
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from pyrogram.errors import UserNotParticipant
@@ -1506,7 +1506,7 @@ async def broadcast_message_capture(
     # Only process users who explicitly entered
     # broadcast mode.
     if message.from_user.id not in broadcast_pending:
-        return
+        raise ContinuePropagation
 
     # Don't process the /broadcast command itself.
     if message.text and message.text.startswith("/broadcast"):
