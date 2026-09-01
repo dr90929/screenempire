@@ -13,8 +13,11 @@ from config import (
     DB_CHANNEL,
     START_FSUB_PROMOTIONS,
 )
-from database import track_user, get_file_from_message
-
+from database import (
+    track_user,
+    get_file_from_message,
+    get_file_name_from_message,
+)
 
 # ============================================================
 # START FSub PROMOTION HELPERS
