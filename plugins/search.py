@@ -2,9 +2,11 @@ import asyncio
 import html
 import re
 import uuid
+from datetime import datetime
 
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
+from pyrogram.types import Message
 
 from config import (
     CHANNEL_USERNAME,
@@ -14,6 +16,7 @@ from config import (
 )
 from database import (
     collection,
+    search_sessions,
     track_user,
     normalize_text,
     get_search_tokens,
@@ -372,5 +375,3 @@ async def search_movie(
     asyncio.create_task(
         delete_search_results()
     )
-
-
