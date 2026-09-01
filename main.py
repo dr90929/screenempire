@@ -1,17 +1,16 @@
 import os
 import asyncio
-import threading
 
+# --- RENDER PYTHON ASYNCIO FIX (Sabse upar hona zaroori hai!) ---
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+# -----------------------------------------------------------------
+
+import threading
 from flask import Flask
 from pyrogram import Client
 
 from config import API_ID, API_HASH, BOT_TOKEN
-
-
-# --- RENDER PYTHON ASYNCIO FIX (Yeh 2 lines error fix karengi) ---
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
-# -----------------------------------------------------------------
 
 
 # ============================================================
