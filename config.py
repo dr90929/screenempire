@@ -37,7 +37,7 @@ ADMIN_ID = int(
 # SEARCH SETTINGS
 # ============================================================
 
-RESULTS_PER_PAGE = 5
+RESULTS_PER_PAGE = 10
 
 # Maximum number of matching files kept in one search session.
 # This prevents unnecessarily large temporary sessions.
