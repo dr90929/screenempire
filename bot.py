@@ -1121,73 +1121,196 @@ async def index_command(
     try:
 
         # ----------------------------------------------------
-        # COMPLETE PRIVATE DB CHANNEL HISTORY
+        # BOT-COMPATIBLE INDEXING
+        #
+        # Telegram's getHistory method is user-only.
+        # Therefore we first send a temporary message to
+        # the DB channel to obtain its latest message ID.
+        #
+        # Then we fetch old messages directly by their IDs.
+        # Pyrogram get_messages() supports bots and up to
+        # 200 message IDs in one request.
         # ----------------------------------------------------
 
-        async for channel_message in client.get_chat_history(
-            DB_CHANNEL
-        ):
+        try:
 
-            scanned += 1
+            await client.get_chat(
+                DB_CHANNEL
+            )
+
+        except Exception as e:
+
+            await progress_message.edit_text(
+                (
+                    "❌ <b>DB Channel access failed!</b>\n\n"
+                    f"<code>{html.escape(str(e))}</code>\n\n"
+                    "Please make sure the bot is an administrator "
+                    "in the private DB channel and that DB_CHANNEL "
+                    "is correct."
+                ),
+                parse_mode=ParseMode.HTML
+            )
+
+            return
+
+        # ----------------------------------------------------
+        # TEMPORARY MESSAGE
+        # ----------------------------------------------------
+
+        temp_msg = await client.send_message(
+            DB_CHANNEL,
+            "⏳ Indexing started..."
+        )
+
+        highest_id = temp_msg.id
+
+        # Delete temporary message immediately.
+        try:
+
+            await temp_msg.delete()
+
+        except Exception:
+            pass
+
+        # ----------------------------------------------------
+        # FETCH OLD MESSAGES BY ID
+        # ----------------------------------------------------
+
+        batch_size = 200
+
+        # Start below the temporary message because that
+        # message is not part of the actual movie database.
+        current_id = highest_id - 1
+
+        while current_id > 0:
+
+            start_id = current_id
+
+            end_id = max(
+                1,
+                start_id - batch_size + 1
+            )
+
+            message_ids = list(
+                range(
+                    start_id,
+                    end_id - 1,
+                    -1
+                )
+            )
 
             try:
 
-                if not (
-                    channel_message.document
-                    or channel_message.video
-                ):
-
-                    skipped += 1
-                    continue
-
-                existing = await collection.find_one({
-                    "message_id": channel_message.id
-                })
-
-                was_saved = await save_file_to_database(
-                    channel_message
+                channel_messages = await client.get_messages(
+                    DB_CHANNEL,
+                    message_ids
                 )
-
-                if was_saved:
-
-                    saved += 1
-
-                elif existing:
-
-                    updated += 1
-
-                else:
-
-                    skipped += 1
 
             except Exception as e:
 
-                errors += 1
-
-                print(
-                    f"Index error at message "
-                    f"{channel_message.id}: {e}"
+                errors += len(
+                    message_ids
                 )
 
-            # Progress every 500 messages.
-            if scanned % 500 == 0:
+                print(
+                    f"Error fetching ID batch "
+                    f"{start_id}-{end_id}: {e}"
+                )
+
+                # Move to the next batch.
+                current_id = end_id - 1
+
+                await asyncio.sleep(1)
+
+                continue
+
+            # ------------------------------------------------
+            # PROCESS BATCH
+            # ------------------------------------------------
+
+            for channel_message in channel_messages:
+
+                scanned += 1
 
                 try:
 
-                    await progress_message.edit_text(
-                        (
-                            f"🔄 <b>Indexing DB Channel...</b>\n\n"
-                            f"📥 Scanned: <b>{scanned}</b>\n"
-                            f"💾 New files: <b>{saved}</b>\n"
-                            f"🔄 Updated: <b>{updated}</b>\n"
-                            f"⏭️ Skipped: <b>{skipped}</b>\n"
-                            f"❌ Errors: <b>{errors}</b>"
-                        ),
-                        parse_mode=ParseMode.HTML
+                    # Deleted/non-existing message IDs can
+                    # return empty message objects.
+                    if (
+                        not channel_message
+                        or getattr(
+                            channel_message,
+                            "empty",
+                            False
+                        )
+                    ):
+
+                        skipped += 1
+                        continue
+
+                    if not (
+                        channel_message.document
+                        or channel_message.video
+                    ):
+
+                        skipped += 1
+                        continue
+
+                    existing = await collection.find_one({
+                        "message_id": channel_message.id
+                    })
+
+                    was_saved = await save_file_to_database(
+                        channel_message
                     )
 
-                except Exception:
-                    pass
+                    if was_saved:
+
+                        saved += 1
+
+                    elif existing:
+
+                        updated += 1
+
+                    else:
+
+                        skipped += 1
+
+                except Exception as e:
+
+                    errors += 1
+
+                    print(
+                        f"Index error at message "
+                        f"{getattr(channel_message, 'id', 'unknown')}: {e}"
+                    )
+
+            # ------------------------------------------------
+            # PROGRESS
+            # ------------------------------------------------
+
+            try:
+
+                await progress_message.edit_text(
+                    (
+                        f"🔄 <b>Indexing DB Channel...</b>\n\n"
+                        f"📥 Scanned: <b>{scanned}</b>\n"
+                        f"💾 New files: <b>{saved}</b>\n"
+                        f"🔄 Updated: <b>{updated}</b>\n"
+                        f"⏭️ Skipped/Empty: <b>{skipped}</b>\n"
+                        f"❌ Errors: <b>{errors}</b>"
+                    ),
+                    parse_mode=ParseMode.HTML
+                )
+
+            except Exception:
+                pass
+
+            # Move to next older batch.
+            current_id = end_id - 1
+
+            # Small delay to reduce Telegram rate-limit risk.
+            await asyncio.sleep(1)
 
         # ----------------------------------------------------
         # COMPLETE
@@ -1196,10 +1319,10 @@ async def index_command(
         await progress_message.edit_text(
             (
                 f"✅ <b>Indexing Completed!</b>\n\n"
-                f"📥 Total messages scanned: <b>{scanned}</b>\n"
+                f"📥 Total IDs scanned: <b>{scanned}</b>\n"
                 f"💾 New files indexed: <b>{saved}</b>\n"
                 f"🔄 Existing records updated: <b>{updated}</b>\n"
-                f"⏭️ Non-file messages: <b>{skipped}</b>\n"
+                f"⏭️ Non-file/empty messages: <b>{skipped}</b>\n"
                 f"❌ Errors: <b>{errors}</b>"
             ),
             parse_mode=ParseMode.HTML
