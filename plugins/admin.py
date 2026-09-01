@@ -67,6 +67,7 @@ async def index_command(
     updated = 0
     skipped = 0
     errors = 0
+    deleted_from_db = 0
 
     try:
 
@@ -175,7 +176,7 @@ async def index_command(
                 continue
 
             # ------------------------------------------------
-            # PROCESS BATCH
+            # PROCESS BATCH + GHOST FILE CLEANUP
             # ------------------------------------------------
 
             for channel_message in channel_messages:
@@ -198,16 +199,37 @@ async def index_command(
                         skipped += 1
                         continue
 
+                    message_id = getattr(
+                        channel_message,
+                        "id",
+                        None
+                    )
+
+                    if not message_id:
+                        skipped += 1
+                        continue
+
+                    # If the Telegram message still exists but
+                    # is no longer a file, remove any stale
+                    # database record for that message.
                     if not (
                         channel_message.document
                         or channel_message.video
                     ):
 
-                        skipped += 1
+                        cleanup_result = await collection.delete_one({
+                            "message_id": message_id
+                        })
+
+                        if cleanup_result.deleted_count > 0:
+                            deleted_from_db += 1
+                        else:
+                            skipped += 1
+
                         continue
 
                     existing = await collection.find_one({
-                        "message_id": channel_message.id
+                        "message_id": message_id
                     })
 
                     was_saved = await save_file_to_database(
@@ -215,15 +237,12 @@ async def index_command(
                     )
 
                     if was_saved:
-
                         saved += 1
 
                     elif existing:
-
                         updated += 1
 
                     else:
-
                         skipped += 1
 
                 except Exception as e:
@@ -233,6 +252,63 @@ async def index_command(
                     print(
                         f"Index error at message "
                         f"{getattr(channel_message, 'id', 'unknown')}: {e}"
+                    )
+
+            # ------------------------------------------------
+            # CLEANUP DELETED/GAP MESSAGE IDS
+            #
+            # Any requested ID that was not returned as a
+            # non-empty Telegram message no longer exists in
+            # the channel. Remove its stale MongoDB index.
+            # ------------------------------------------------
+
+            returned_ids = {
+                getattr(
+                    channel_message,
+                    "id",
+                    None
+                )
+                for channel_message in channel_messages
+                if (
+                    channel_message
+                    and not getattr(
+                        channel_message,
+                        "empty",
+                        False
+                    )
+                    and getattr(
+                        channel_message,
+                        "id",
+                        None
+                    )
+                )
+            }
+
+            missing_ids = set(
+                message_ids
+            ) - returned_ids
+
+            if missing_ids:
+
+                try:
+
+                    cleanup_result = await collection.delete_many({
+                        "message_id": {
+                            "$in": list(missing_ids)
+                        }
+                    })
+
+                    deleted_from_db += (
+                        cleanup_result.deleted_count
+                    )
+
+                except Exception as e:
+
+                    errors += 1
+
+                    print(
+                        f"Ghost cleanup error for batch "
+                        f"{start_id}-{end_id}: {e}"
                     )
 
             # ------------------------------------------------
@@ -247,6 +323,7 @@ async def index_command(
                         f"📥 Scanned: <b>{scanned}</b>\n"
                         f"💾 New files: <b>{saved}</b>\n"
                         f"🔄 Updated: <b>{updated}</b>\n"
+                        f"🗑️ Cleaned from DB: <b>{deleted_from_db}</b>\n"
                         f"⏭️ Skipped/Empty: <b>{skipped}</b>\n"
                         f"❌ Errors: <b>{errors}</b>"
                     ),
@@ -272,6 +349,7 @@ async def index_command(
                 f"📥 Total IDs scanned: <b>{scanned}</b>\n"
                 f"💾 New files indexed: <b>{saved}</b>\n"
                 f"🔄 Existing records updated: <b>{updated}</b>\n"
+                f"🗑️ Cleaned from DB: <b>{deleted_from_db}</b>\n"
                 f"⏭️ Non-file/empty messages: <b>{skipped}</b>\n"
                 f"❌ Errors: <b>{errors}</b>"
             ),
@@ -699,5 +777,4 @@ async def broadcast_message_capture(
 
     except Exception:
         pass
-
 
