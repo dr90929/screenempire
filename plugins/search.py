@@ -2,7 +2,7 @@ import asyncio
 import html
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 from pyrogram import Client, filters
 from pyrogram.enums import ParseMode
@@ -13,6 +13,7 @@ from config import (
     AUTO_DELETE_TIME,
     MAX_SEARCH_RESULTS,
     RESULTS_PER_PAGE,
+    SEARCH_FSUB_PROMOTIONS,
 )
 from database import (
     collection,
@@ -21,8 +22,137 @@ from database import (
     normalize_text,
     get_search_tokens,
 )
-from plugins.start import is_subscribed
+from plugins.start import (
+    is_channel_subscribed,
+    build_fsub_keyboard,
+)
 from plugins.callbacks import build_results_keyboard
+
+
+# ============================================================
+# SEARCH FSub PROMOTION HELPERS
+# ============================================================
+
+def get_active_search_promotions():
+    """
+    Returns only currently active SEARCH promotions.
+
+    A promotion is active when:
+    - enabled = True
+    - current date >= start_date
+    - current date <= end_date
+
+    After end_date, the promotion is automatically ignored.
+    """
+
+    active_promotions = []
+
+    today = date.today()
+
+    for promotion in SEARCH_FSUB_PROMOTIONS:
+
+        try:
+
+            if not promotion.get(
+                "enabled",
+                True
+            ):
+                continue
+
+            start_date = date.fromisoformat(
+                promotion["start_date"]
+            )
+
+            end_date = date.fromisoformat(
+                promotion["end_date"]
+            )
+
+            if (
+                start_date
+                <= today
+                <= end_date
+            ):
+
+                active_promotions.append(
+                    promotion
+                )
+
+        except Exception as e:
+
+            print(
+                f"Invalid SEARCH promotion configuration: {e}"
+            )
+
+    return active_promotions
+
+
+async def get_missing_search_channels(
+    client,
+    user_id
+):
+    """
+    Checks:
+
+    1. Permanent ScreenEmpire main channel.
+    2. Currently active paid SEARCH promotions.
+
+    Returns only channels that the user has not joined.
+    """
+
+    missing_channels = []
+
+    # --------------------------------------------------------
+    # PERMANENT MAIN SCREENEMPIRE CHANNEL
+    # --------------------------------------------------------
+
+    if CHANNEL_USERNAME:
+
+        subscribed = await is_channel_subscribed(
+            client,
+            CHANNEL_USERNAME,
+            user_id
+        )
+
+        if not subscribed:
+
+            missing_channels.append({
+                "name": "ScreenEmpire",
+                "url": f"https://t.me/{CHANNEL_USERNAME}"
+            })
+
+    # --------------------------------------------------------
+    # ACTIVE PAID SEARCH PROMOTIONS
+    # --------------------------------------------------------
+
+    for promotion in get_active_search_promotions():
+
+        chat_id = promotion.get(
+            "chat_id"
+        )
+
+        if not chat_id:
+            continue
+
+        subscribed = await is_channel_subscribed(
+            client,
+            chat_id,
+            user_id
+        )
+
+        if not subscribed:
+
+            missing_channels.append({
+                "name": promotion.get(
+                    "name",
+                    "Required Channel"
+                ),
+                "url": promotion.get(
+                    "url",
+                    ""
+                )
+            })
+
+    return missing_channels
 
 
 # ============================================================
@@ -51,26 +181,51 @@ async def search_movie(
     user_id = message.from_user.id
 
     # --------------------------------------------------------
-    # FORCE SUBSCRIBE CHECK
+    # MULTI-CHANNEL SEARCH FSub
+    #
+    # Permanent:
+    #   ScreenEmpire
+    #
+    # Temporary:
+    #   Active SEARCH paid promotions
     # --------------------------------------------------------
 
-    if CHANNEL_USERNAME:
+    missing_channels = await get_missing_search_channels(
+        client,
+        user_id
+    )
 
-        if not await is_subscribed(
-            client,
-            user_id
-        ):
+    if missing_channels:
 
-            await message.reply_text(
-                (
-                    f"⚠️ You must join "
-                    f"@{html.escape(CHANNEL_USERNAME)} "
-                    f"to search movies."
-                ),
-                parse_mode=ParseMode.HTML
+        keyboard = build_fsub_keyboard(
+            missing_channels,
+            "check_search_sub"
+        )
+
+        if len(missing_channels) == 1:
+
+            instruction = (
+                "Please join the required channel below "
+                "to search movies."
             )
 
-            return
+        else:
+
+            instruction = (
+                "Please join all required channels below "
+                "to search movies."
+            )
+
+        await message.reply_text(
+            (
+                f"⚠️ <b>Access Restricted!</b>\n\n"
+                f"{instruction}"
+            ),
+            reply_markup=keyboard,
+            parse_mode=ParseMode.HTML
+        )
+
+        return
 
     # --------------------------------------------------------
     # QUERY
@@ -375,3 +530,69 @@ async def search_movie(
     asyncio.create_task(
         delete_search_results()
     )
+
+
+# ============================================================
+# SEARCH FSub TRY AGAIN
+# ============================================================
+
+@Client.on_callback_query(
+    filters.regex("^check_search_sub$")
+)
+async def check_search_subscription_callback(
+    client,
+    callback_query
+):
+
+    await track_user(
+        callback_query.from_user
+    )
+
+    user_id = callback_query.from_user.id
+
+    missing_channels = await get_missing_search_channels(
+        client,
+        user_id
+    )
+
+    if missing_channels:
+
+        keyboard = build_fsub_keyboard(
+            missing_channels,
+            "check_search_sub"
+        )
+
+        await callback_query.answer(
+            "❌ You still need to join the required channel(s).",
+            show_alert=True
+        )
+
+        try:
+
+            await callback_query.message.edit_reply_markup(
+                reply_markup=keyboard
+            )
+
+        except Exception:
+            pass
+
+        return
+
+    await callback_query.answer(
+        "✅ All required channels verified!",
+        show_alert=True
+    )
+
+    try:
+
+        await callback_query.message.edit_text(
+            (
+                "✅ <b>Verified successfully!</b>\n\n"
+                "Now send the movie or series name "
+                "you want to search. 🍿"
+            ),
+            parse_mode=ParseMode.HTML
+        )
+
+    except Exception:
+        pass
