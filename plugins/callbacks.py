@@ -1,5 +1,6 @@
 import asyncio
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from config import RESULTS_PER_PAGE
 from database import search_sessions, format_file_size
